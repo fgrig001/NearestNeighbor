@@ -2,7 +2,13 @@
 #define _MENU_H
 
 #include <iostream>
+#include <cmath>
+#include <fstream>
+#include <sstream>
+#include <cstdlib>
 #include <string>
+#include <vector>
+#include "Instance.h"
 
 class Menu{
    public:
@@ -19,23 +25,62 @@ class Menu{
       SearchAlgorithm SearchAlgorithmSelected(){ return searchType; }
       bool ExitSelected(){ return exit; }
       std::string FileSelected(){ return fileName; }
+      std::vector<Instance*> GetInstances(){ return instances; }
 
       // Helper Functions TODO: make private
       void GetFileInput();
       void GetSearchAlgorithmInput();
+      void Print(){
+         for( auto i = instances.begin(); i != instances.end(); ++i){
+            (*i)->PrintFeatures();
+         }
+      }
 
    private:
       // Variables
       SearchAlgorithm searchType{FORWARD_SELECTION};
       bool exit{0};
       std::string fileName;
+      std::vector<Instance*> instances; 
+
+      void NormalizeInstanceData();
+      void NormalizeFeature(int feature_index);
 };
+
+void Menu::NormalizeInstanceData(){
+   for(int i=0;i<instances.at(0)->GetNumFeatures();++i){
+      NormalizeFeature(i);
+   }
+}
+
+void Menu::NormalizeFeature(int feature_index){
+   // Find mean
+   int numInstances = instances.size();
+   double mean=0;
+   for( auto i = instances.begin(); i != instances.end(); ++i){
+      mean += (*i)->GetFeature(feature_index) / numInstances;
+   }
+
+   // Find standard dev
+   double std_dev=0;
+   double std_mean=0;
+   for( auto i = instances.begin(); i != instances.end(); ++i){
+      std_mean += pow(mean - (*i)->GetFeature(feature_index),2) / numInstances;
+   }
+   std_dev = sqrt(std_mean); 
+
+   // Normalize data
+   for( auto i = instances.begin(); i != instances.end(); ++i){
+      (*i)->SetFeature(feature_index,((*i)->GetFeature(feature_index) - mean)/std_dev);
+   }
+}
 
 Menu::~Menu(){
 }
 
 void Menu::GetUserInput(){
    GetFileInput();
+   NormalizeInstanceData();
    GetSearchAlgorithmInput();
 }
 
@@ -49,8 +94,44 @@ void Menu::PromptForExit(){
 
 
 void Menu::GetFileInput(){
-   std::cout<<"Type in the name of the file to test: "<<std::endl;
-   std::cin>>fileName;
+   // Local variables 
+   Instance *tmp;
+   std::string ln;
+   std::string s;
+   std::ifstream inFile;
+   float f;
+   bool classFlag;
+   bool validInput = false;
+
+   do{
+      // Get file name
+      std::cout<<"Type in the name of the file to test: "<<std::endl;
+      std::cin>>fileName;
+
+      // Open file and read in instances
+      inFile.open(fileName.c_str());
+      if(inFile.is_open()){
+         while( getline(inFile,ln) ){
+            classFlag = true;
+            tmp = new Instance;
+            std::istringstream ss(ln);
+            while( ss>>s ){
+               f = atof(s.c_str());
+               if(classFlag == true){
+                  tmp->SetClass((int)f);
+                  classFlag = false;
+               }else{ 
+                  tmp->AddFeature(f);
+               }
+            }
+            instances.push_back(tmp);
+            tmp = NULL;
+         }
+         validInput = true;
+      }else{
+         std::cout<<"Error opening file!\n";
+      }
+   }while(validInput == false);
 }
 
 void Menu::GetSearchAlgorithmInput(){
