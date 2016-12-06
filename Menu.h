@@ -25,7 +25,7 @@ class Menu{
       SearchAlgorithm SearchAlgorithmSelected(){ return searchType; }
       bool ExitSelected(){ return exit; }
       std::string FileSelected(){ return fileName; }
-      std::vector<Instance*> GetInstances(){ return instances; }
+      std::vector<Instance*> &GetInstances(){ return instances; }
 
       // Helper Functions TODO: make private
       void GetFileInput();
@@ -102,10 +102,11 @@ void Menu::GetFileInput(){
    float f;
    bool classFlag;
    bool validInput = false;
-
+   // Intro
+   std::cout<<"\nWelcome to Frederick Grigsbys Feature Selection Algorithm\n";
    do{
       // Get file name
-      std::cout<<"Type in the name of the file to test: "<<std::endl;
+      std::cout<<"Type in the name of the file to test: ";
       std::cin>>fileName;
 
       // Open file and read in instances
