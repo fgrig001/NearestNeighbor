@@ -16,7 +16,6 @@ class Menu{
 
       // Constructor 
       Menu() {}
-      ~Menu();
 
       void GetUserInput();
       void PromptForExit();
@@ -42,45 +41,10 @@ class Menu{
       bool exit{0};
       std::string fileName;
       std::vector<Instance*> instances; 
-
-      void NormalizeInstanceData();
-      void NormalizeFeature(int feature_index);
 };
-
-void Menu::NormalizeInstanceData(){
-   for(int i=0;i<instances.at(0)->GetNumFeatures();++i){
-      NormalizeFeature(i);
-   }
-}
-
-void Menu::NormalizeFeature(int feature_index){
-   // Find mean
-   int numInstances = instances.size();
-   double mean=0;
-   for( auto i = instances.begin(); i != instances.end(); ++i){
-      mean += (*i)->GetFeature(feature_index) / numInstances;
-   }
-
-   // Find standard dev
-   double std_dev=0;
-   double std_mean=0;
-   for( auto i = instances.begin(); i != instances.end(); ++i){
-      std_mean += pow(mean - (*i)->GetFeature(feature_index),2) / numInstances;
-   }
-   std_dev = sqrt(std_mean); 
-
-   // Normalize data
-   for( auto i = instances.begin(); i != instances.end(); ++i){
-      (*i)->SetFeature(feature_index,((*i)->GetFeature(feature_index) - mean)/std_dev);
-   }
-}
-
-Menu::~Menu(){
-}
 
 void Menu::GetUserInput(){
    GetFileInput();
-   NormalizeInstanceData();
    GetSearchAlgorithmInput();
 }
 

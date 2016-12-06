@@ -3,38 +3,72 @@
 #define _NNSEARCH_H_
 
 #include <vector>
+#include <queue>
 #include "Instance.h"
 #include <cmath>
 #include <algorithm>
 
+struct Node{
+   std::vector<int> featureIndices;
+   float percentage;
+   Node &operator=(const Node &other){
+      featureIndices = other.featureIndices;
+      percentage = other.percentage;
+   }
+};
+
 class NNSearch{
    public:
       void RunForwardSelection(std::vector<Instance*> &_instances);
-      void RunBackwardElimination(std::vector<Instance*> &_instances){}
-      void RunCustom(std::vector<Instance*> &_instances){}
+      void RunBackwardElimination(std::vector<Instance*> &_instances);
+      void RunCustom(std::vector<Instance*> &_instances);
    private:
       /* Helper Functions */
       void RunForwardSelection(std::vector<Instance*> &_instances,
                                std::vector<int> &feature_indices);
+      void RunBackwardElimination(std::vector<Instance*> &_instances,
+                               std::vector<int> &feature_indices);
+      void RunCustom(std::vector<Instance*> &_instances,
+                               std::vector<int> &feature_indices);
+
       float NearestNeighbor(std::vector<Instance*> &_instances,
                             std::vector<int> &feature_indices);
       float GetDistance(Instance* a, Instance* b,std::vector<int> feature_indices);
       void PrintV(std::vector<int> &v);
+
+      void NormalizeData(std::vector<Instance*> &_instances);
+
       /* Variables */
       float best_percentage{0.f};
       float prev_best_percentage{0.f};
       std::vector<int> best_feature_indices;
       int num_features{0};
       int num_instances{0};
+
+      struct CompareNode{
+         bool operator()(const Node lhs,const Node rhs) {
+            return lhs.percentage < rhs.percentage;
+         }
+      };
+      std::priority_queue<Node, std::vector<Node>, CompareNode> pQueue;
 };
 
+
 void NNSearch::RunForwardSelection(std::vector<Instance*> &_instances){
-   /* Set up and start recursion for Forward Selection */
+   // Local variables 
    std::vector<int> feature_indices;
    best_percentage = 0.f;
    prev_best_percentage = 0.f;
    num_features = _instances.at(0)->GetNumFeatures();
    num_instances = _instances.size();
+   // Print dataset info
+   std::cout<<"This dataset has "<<num_features
+            <<" features (not including the class attribute), with "
+            <<num_instances<<" instances\n\n";
+   // Normalize data
+   std::cout<<"Please wait while I normalize the data... ";
+   NormalizeData(_instances);
+   std::cout<<"Done!\n\n";
    // Run Recursively 
    RunForwardSelection(_instances,feature_indices);
    // Output final results
@@ -97,7 +131,179 @@ void NNSearch::RunForwardSelection(std::vector<Instance*> &_instances,
    RunForwardSelection(_instances,local_best_feature_indices);
 }
 
-// Returns acuracy as a %
+void NNSearch::RunBackwardElimination(std::vector<Instance*> &_instances){
+   // Local variables 
+   std::vector<int> feature_indices;
+   best_percentage = 0.f;
+   prev_best_percentage = 0.f;
+   num_features = _instances.at(0)->GetNumFeatures();
+   num_instances = _instances.size();
+   for(int i=0;i<num_features;++i){
+      feature_indices.push_back(i);
+   }
+   // Print dataset info
+   std::cout<<"This dataset has "<<num_features
+            <<" features (not including the class attribute), with "
+            <<num_instances<<" instances\n\n";
+   // Normalize data
+   std::cout<<"Please wait while I normalize the data... ";
+   NormalizeData(_instances);
+   std::cout<<"Done!\n\n";
+   // First Run 
+   best_percentage = NearestNeighbor(_instances,feature_indices);
+   best_feature_indices = feature_indices;
+   // Print results
+   std::cout<<"\nBeginning search.\n";
+   std::cout<<"Using feature(s) ";
+   PrintV(feature_indices);
+   std::cout<<" accuracy is "<<100*best_percentage<<"%\n\n";
+   // Run Recursively 
+   RunBackwardElimination(_instances,feature_indices);
+   // Output final results
+   std::cout<<"\nFinished search!! The best feature subset is ";
+   PrintV(best_feature_indices);
+   std::cout<<", which has an accuracy of "<<100*best_percentage<<"%\n";
+   // Flush global variables for next run
+   best_feature_indices.clear();
+}
+
+void NNSearch::RunBackwardElimination(std::vector<Instance*> &_instances,
+                         std::vector<int> &feature_indices)
+{
+   float local_best_percentage = 0.f;
+   std::vector<int> local_best_feature_indices;
+   std::vector<int> temp_feature_indices;
+   for(int i=num_features-1; i >= 0; --i){
+      temp_feature_indices = feature_indices;
+      // If value exists remove it 
+      auto val = std::find(temp_feature_indices.begin(),temp_feature_indices.end(),i);
+      if(val != temp_feature_indices.end()){
+         temp_feature_indices.erase(val);
+      }else{ continue; }
+      // Run NN 
+      float accuracy  = NearestNeighbor(_instances,temp_feature_indices);
+      // Print results
+      std::cout<<"Using feature(s) ";
+      PrintV(temp_feature_indices);
+      std::cout<<" accuracy is "<<100*accuracy<<"%"<<std::endl;
+      // Check for highest local accuracy
+      if(accuracy > local_best_percentage){
+         local_best_percentage = accuracy;
+         local_best_feature_indices = temp_feature_indices;
+      }
+   }
+   // Print best local feature set
+   if(temp_feature_indices.size() != 1){
+      std::cout<<std::endl;
+      if(local_best_percentage < prev_best_percentage){
+         std::cout<<"(Warning, Accuracy has decreased! Continuing "
+                  <<"search in case of local maxima\n"; 
+      }
+      prev_best_percentage = local_best_percentage;
+      std::cout<<"Feature set ";
+      PrintV(local_best_feature_indices);
+      std::cout<<" was best, accuracy is "<<100*local_best_percentage<<"%"<<std::endl;
+      std::cout<<std::endl;
+   }
+   // Check for highest global accuracy
+   if(local_best_percentage > best_percentage){
+      best_percentage = local_best_percentage;
+      best_feature_indices = local_best_feature_indices;
+   }
+   // End recursion condition
+   if(local_best_feature_indices.size() == 1){
+      return;
+   }
+   // Recurse 
+   RunBackwardElimination(_instances,local_best_feature_indices);
+}
+
+
+void NNSearch::RunCustom(std::vector<Instance*> &_instances){
+   num_features = _instances.at(0)->GetNumFeatures();
+   num_instances = _instances.size();
+   Node node;
+   Node new_node;
+   Node best_node;
+   // Set up 
+   for(int i=0;i<num_features;++i){
+      new_node = node;
+      new_node.featureIndices.push_back(i);
+      new_node.percentage = NearestNeighbor(_instances,new_node.featureIndices);
+      pQueue.push(new_node);
+   }
+   while(!pQueue.empty()){
+      std::cout<<"Queue Size: "<<pQueue.size()<<std::endl;
+      node = pQueue.top();
+      pQueue.pop(); 
+      std::cout<<"Using feature(s) ";
+      PrintV(node.featureIndices);
+      std::cout<<" accuracy is "<<100*node.percentage<<"%\n";
+      // Check if top node is best node
+      if(node.percentage > best_node.percentage){
+         best_node = node;
+      }
+      // Expand node
+      for(int i = 0;i<num_features;++i){
+         new_node = node;
+         // If node does not contain index then add it
+         if(std::find(node.featureIndices.begin(),node.featureIndices.end(),i) 
+            == node.featureIndices.end())
+         {
+            std::cout<<"Pushing back! "<<i<<std::endl;
+            new_node.featureIndices.push_back(i);
+         }else{ continue; }
+         // calculate NN for new node
+         new_node.percentage = NearestNeighbor(_instances,new_node.featureIndices);
+         // add new node only if it is better then old node
+         if(new_node.percentage > node.percentage){
+            pQueue.push(new_node);
+         }
+      }
+   }
+   std::cout<<"Using feature(s) ";
+   PrintV(best_node.featureIndices);
+   std::cout<<" accuracy is "<<100*best_node.percentage<<"%\n";
+
+   /*
+   best_percentage = 0.f;
+   prev_best_percentage = 0.f;
+
+   feature_indices.push_back(0);
+   feature_indices.push_back(0);
+
+   for(int i=0;i<num_features;++i){
+      feature_indices.at(0)=i;
+      for(int j=i+1;j<num_features;++j){
+         feature_indices.at(1)=j;
+         float percentage = NearestNeighbor(_instances,feature_indices);
+         std::cout<<"Using feature(s) ";
+         PrintV(feature_indices);
+         std::cout<<" accuracy is "<<100*percentage<<"%\n";
+         if(percentage > best1){
+            best1 = percentage;
+            best1_feature_indices = feature_indices;
+         }else if(percentage > best2){
+            best2 = percentage;
+            best2_feature_indices = feature_indices;
+         }
+      }
+   }
+   std::cout<<"Best 1 using feature(s) ";
+   PrintV(best1_feature_indices);
+   std::cout<<" accuracy is "<<100*best1<<"%\n";
+   std::cout<<"Best 2 using feature(s) ";
+   PrintV(best2_feature_indices);
+   std::cout<<" accuracy is "<<100*best2<<"%\n";
+   */
+}
+
+void NNSearch::RunCustom(std::vector<Instance*> &_instances,
+               std::vector<int> &feature_indices){
+
+}
+
+// Returns acuracy as a fraction
 float NNSearch::NearestNeighbor(std::vector<Instance*> &_instances,
                                 std::vector<int> &feature_indices)
 {
@@ -149,6 +355,30 @@ void NNSearch::PrintV(std::vector<int> &v){
       std::cout<<(*i)+1;
    }
    std::cout<<"}";
+}
+
+void NNSearch::NormalizeData(std::vector<Instance*> &_instances){
+   for(int j=0;j<_instances.at(0)->GetNumFeatures();++j){
+      // Find mean
+      int numInstances = _instances.size();
+      double mean=0;
+      for( auto i = _instances.begin(); i != _instances.end(); ++i){
+         mean += (*i)->GetFeature(j) / numInstances;
+      }
+
+      // Find standard dev
+      double std_dev=0;
+      double std_mean=0;
+      for( auto i = _instances.begin(); i != _instances.end(); ++i){
+         std_mean += pow(mean - (*i)->GetFeature(j),2) / numInstances;
+      }
+      std_dev = sqrt(std_mean); 
+
+      // Normalize data
+      for( auto i = _instances.begin(); i != _instances.end(); ++i){
+         (*i)->SetFeature(j,((*i)->GetFeature(j) - mean)/std_dev);
+      }
+   }
 }
 
 #endif
