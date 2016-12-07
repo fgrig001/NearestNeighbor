@@ -51,6 +51,21 @@ class NNSearch{
          }
       };
       std::priority_queue<Node, std::vector<Node>, CompareNode> pQueue;
+
+		bool IsEqual(Node &a,Node &b){
+			bool foundFlag = false;
+			if(a.percentage != b.percentage) return false;
+			if(a.featureIndices.size() != b.featureIndices.size()) return false;
+			for(int i=0;i<a.featureIndices.size();++i){
+				for(int j=0;j<a.featureIndices.size();++j){
+					if(a.featureIndices.at(i)==b.featureIndices.at(j)){
+						break;
+					}else if(j==a.featureIndices.size()-1){
+						return false;
+					}
+				}
+			}
+		}
 };
 
 
@@ -222,20 +237,87 @@ void NNSearch::RunBackwardElimination(std::vector<Instance*> &_instances,
 void NNSearch::RunCustom(std::vector<Instance*> &_instances){
    num_features = _instances.at(0)->GetNumFeatures();
    num_instances = _instances.size();
+	std::vector<int> features;
+	std::vector<int> best_features;
+	std::vector<int> second_best_features;
+	float percentage;
+	float best_percentage=0;
+	float second_best_percentage=0;
+	features.push_back(0);
+	features.push_back(0);
+   for(int i=0;i<num_features-1;++i){
+   	for(int j=i+1;j<num_features;++j){
+			features.at(0)=i;
+			features.at(1)=j;
+			percentage = NearestNeighbor(_instances,features);
+			std::cout<<"Using feature(s) ";
+			PrintV(features);
+			std::cout<<" accuracy is "<<100*percentage<<"%"<<std::endl;
+			if(percentage > best_percentage){
+				best_percentage=percentage;
+				best_features = features;
+			}else if(percentage > second_best_percentage){
+				second_best_percentage=percentage;
+				second_best_features = features;
+			}
+		}
+	}
+	std::cout<<std::endl;
+	std::cout<<"Feature set ";
+	PrintV(best_features);
+	std::cout<<" was best, accuracy is "<<100*best_percentage<<"%"<<std::endl;
+	std::cout<<std::endl;
+	std::cout<<"Feature set ";
+	PrintV(second_best_features);
+	std::cout<<" was second best, accuracy is "<<100*second_best_percentage<<"%"<<std::endl;
+	std::cout<<std::endl;
+
+	// Combine first and second best features
+	features.pop_back();
+	features.pop_back();
+	features.push_back(best_features.at(0));
+	features.push_back(best_features.at(1));
+	if(second_best_features.at(0) != best_features.at(0)
+	  && second_best_features.at(0) != best_features.at(1))
+	{
+		features.push_back(second_best_features.at(0));
+	}
+	if(second_best_features.at(1) != best_features.at(0)
+	  && second_best_features.at(1) != best_features.at(1))
+	{
+		features.push_back(second_best_features.at(1));
+	}
+	percentage = NearestNeighbor(_instances,features);
+	std::cout<<std::endl;
+	std::cout<<"Combined feature set ";
+	PrintV(features);
+	std::cout<<" accuracy is "<<100*percentage<<"%"<<std::endl;
+	std::cout<<std::endl;
+
+	/*
+   num_features = _instances.at(0)->GetNumFeatures();
+   num_instances = _instances.size();
    Node node;
    Node new_node;
    Node best_node;
    // Set up 
-   for(int i=0;i<num_features;++i){
+   for(int i=0;i<num_features-1;++i){
       new_node = node;
       new_node.featureIndices.push_back(i);
+      new_node.featureIndices.push_back(i+1);
       new_node.percentage = NearestNeighbor(_instances,new_node.featureIndices);
       pQueue.push(new_node);
    }
    while(!pQueue.empty()){
-      std::cout<<"Queue Size: "<<pQueue.size()<<std::endl;
+		// Grab first node in queueu
       node = pQueue.top();
       pQueue.pop(); 
+		new_node = pQueue.top();
+		// Remove duplicates
+		while(NNSearch::IsEqual(new_node,node)){
+			pQueue.pop(); 
+			new_node = pQueue.top();
+		}
       std::cout<<"Using feature(s) ";
       PrintV(node.featureIndices);
       std::cout<<" accuracy is "<<100*node.percentage<<"%\n";
@@ -250,7 +332,6 @@ void NNSearch::RunCustom(std::vector<Instance*> &_instances){
          if(std::find(node.featureIndices.begin(),node.featureIndices.end(),i) 
             == node.featureIndices.end())
          {
-            std::cout<<"Pushing back! "<<i<<std::endl;
             new_node.featureIndices.push_back(i);
          }else{ continue; }
          // calculate NN for new node
@@ -264,38 +345,7 @@ void NNSearch::RunCustom(std::vector<Instance*> &_instances){
    std::cout<<"Using feature(s) ";
    PrintV(best_node.featureIndices);
    std::cout<<" accuracy is "<<100*best_node.percentage<<"%\n";
-
-   /*
-   best_percentage = 0.f;
-   prev_best_percentage = 0.f;
-
-   feature_indices.push_back(0);
-   feature_indices.push_back(0);
-
-   for(int i=0;i<num_features;++i){
-      feature_indices.at(0)=i;
-      for(int j=i+1;j<num_features;++j){
-         feature_indices.at(1)=j;
-         float percentage = NearestNeighbor(_instances,feature_indices);
-         std::cout<<"Using feature(s) ";
-         PrintV(feature_indices);
-         std::cout<<" accuracy is "<<100*percentage<<"%\n";
-         if(percentage > best1){
-            best1 = percentage;
-            best1_feature_indices = feature_indices;
-         }else if(percentage > best2){
-            best2 = percentage;
-            best2_feature_indices = feature_indices;
-         }
-      }
-   }
-   std::cout<<"Best 1 using feature(s) ";
-   PrintV(best1_feature_indices);
-   std::cout<<" accuracy is "<<100*best1<<"%\n";
-   std::cout<<"Best 2 using feature(s) ";
-   PrintV(best2_feature_indices);
-   std::cout<<" accuracy is "<<100*best2<<"%\n";
-   */
+	*/
 }
 
 void NNSearch::RunCustom(std::vector<Instance*> &_instances,
